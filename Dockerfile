@@ -39,6 +39,19 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 # Run sovereignty audit before build
 RUN node scripts/sovereignty-audit.js --min-score=90 || echo "Audit warning - continuing build"
 
+# ... (votre code précédent dans Stage 2)
+
+# Environment variables pour Prisma (indispensable pour que le build accède à la DB)
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+
+# Lancer la migration pendant le build
+RUN npx prisma db push --accept-data-loss
+
+# Build the application
+RUN npm run build
+# ...
+
 # Build the application
 RUN npm run build
 
