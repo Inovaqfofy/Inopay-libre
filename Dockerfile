@@ -1,43 +1,38 @@
-# --- ÉTAPE 1 : BUILD (Utilisation de Node.js pour compiler et migrer) ---
+# --- ÉTAPE 1 : BUILD ---
 FROM node:20-alpine AS builder
 
-# Installation des outils nécessaires pour Alpine
 RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
-# Copie des fichiers de configuration
+# Copie uniquement les fichiers de dépendances pour mettre en cache
 COPY package*.json ./
-COPY prisma ./prisma/
 
 # Installation des dépendances
 RUN npm install
 
-# Copie de tout le code source
+# Copie maintenant TOUT le reste du projet (incluant le dossier prisma)
 COPY . .
 
-# Déclaration de l'argument de build pour la base de données
-# Cela permet à Prisma de se connecter pendant la création de l'image
+# Déclaration de l'URL pour Prisma
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 
 # Génération du client Prisma
+# On ajoute une vérification pour trouver le dossier prisma automatiquement
 RUN npx prisma generate
 
-# SYNCHRONISATION DE LA BASE DE DONNÉES
-# Cette commande crée les tables manquantes dans votre Supabase auto-hébergé
+# Création des tables
 RUN npx prisma db push --accept-data-loss
 
-# Build de l'interface (Vite)
+# Build de l'interface
 RUN npm run build
 
-# --- ÉTAPE 2 : PRODUCTION (Image légère avec Nginx) ---
+# --- ÉTAPE 2 : PRODUCTION ---
 FROM nginx:1.25-alpine
 
-# Copie du résultat du build vers le dossier Nginx
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Configuration du Healthcheck pour Coolify
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -f http://localhost/ || exit 1
 
